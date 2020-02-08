@@ -8,6 +8,7 @@ enum TYPE
 	REGISTER,
 	LOGIN,
 	GETFRIEND,
+	GETIPPORT,
 	EXIT
 };
 
@@ -22,10 +23,11 @@ struct CliData
 
 void DealCli(int fd, short event, void* arg);
 void Connect(int fd, short event, void* arg);
-void Register(int fd, string& message, struct sockaddr_in& caddr);
-void Login(int fd, string& message, struct sockaddr_in& caddr);
-void GetFriend(int fd, string& message, struct sockaddr_in& caddr);
-void Exit(int fd, string& message, struct sockaddr_in& caddr);
+void Register(int fd, string message, struct sockaddr_in& caddr);
+void Login(int fd, string message, struct sockaddr_in& caddr);
+void GetFriend(int fd, string message, struct sockaddr_in& caddr);
+void Exit(int fd, string message, struct sockaddr_in& caddr);
+void GetIpPort(int fd, string message, struct sockaddr_in& caddr);
 void* pthread_run(void*);
 
 class Sys
@@ -113,7 +115,7 @@ void Run(int fd, short event, void* arg)
 
 	if (-1 == read.parse(json, val))
 	{
-		LOGE("json prase error!");
+		LOGE("json prase fail!");
 		return;
 	}
 
@@ -136,7 +138,7 @@ void Run(int fd, short event, void* arg)
 	//cout << json << endl;
 	if (read.parse(json, val2) == -1)
 	{
-		LOGE("json parse error!");
+		LOGE("json parse fail!");
 		return;
 	}
 
@@ -167,7 +169,7 @@ public:
 		serfd = socket(AF_INET, SOCK_STREAM, 0);
 		if (serfd == -1)
 		{
-			LOGE("ser socket fd create error");
+			LOGE("ser socket fd create fail");
 			return;
 		}
 		LOGD("ser socket fd create success!");
@@ -180,7 +182,7 @@ public:
 		int res = bind(serfd, (struct sockaddr*) & saddr, sizeof(sockaddr));
 		if (res == -1)
 		{
-			LOGE("ser bind error!");
+			LOGE("ser bind fail!");
 			return;
 		}
 
@@ -188,7 +190,7 @@ public:
 
 		if (res == -1)
 		{
-			LOGE("ser listen error!");
+			LOGE("ser listen fail!");
 			return;
 		}
 
@@ -237,7 +239,7 @@ void listen_cb(int fd, short event, void* arg)
 
 	if (-1 == clifd)
 	{
-		LOGE("accept error");
+		LOGE("accept fail");
 		return;
 	}
 

@@ -5,6 +5,7 @@ using namespace std;
 #include<arpa/inet.h>
 #include<sys/socket.h>
 #include<string.h>
+#include<string>
 #include<json/json.h>
 #include<stdio.h>
 #include<pthread.h>
@@ -37,8 +38,9 @@ int main()
 	saddr.sin_port = htons(port);
 	saddr.sin_family = AF_INET;
 
-	for (int i = 0; i < 100; ++i)
-	{
+	for (int i = 0; i < 50; ++i)
+	{		
+		sleep(1);
 		int fd = socket(AF_INET, SOCK_STREAM, 0);
 		
 		int res = connect(fd, (struct sockaddr*) & saddr, sizeof(saddr));
@@ -50,7 +52,7 @@ int main()
 		char buff1[10] = { 0 };
 		sprintf(buff1, "jiadai%d", i);
 		string name = buff1;
-		string pw("123456");
+		int pw;
 		Json::Value val;
 		val["userid"] = i;
 		val["type"] = REGISTER;
@@ -58,7 +60,7 @@ int main()
 		val["passwd"] = pw;
 		
 		cout << val.toStyledString() << endl;
-		sleep(1);
+
 		res = send(fd, val.toStyledString().c_str(), val.toStyledString().size(), 0);
 		if (res == -1)
 		{
@@ -74,7 +76,7 @@ int main()
 			return 0;
 		}
 		cout << buff << endl;
-		close(fd);
+		//close(fd);
 	}
 	return 0;
 }

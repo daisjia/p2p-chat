@@ -1,7 +1,7 @@
 INC += -I./
 LIB +=  -ljson -levent -lpthread
 OBJ_DIR = ./obj
-OBJ =  $(OBJ_DIR)/Socket.o  $(OBJ_DIR)/sys.o $(OBJ_DIR)/main.o
+OBJ =  $(OBJ_DIR)/Socket.o  $(OBJ_DIR)/sys.o $(OBJ_DIR)/main.o $(OBJ_DIR)/mytime.o 
 OBJ_EXT = .o
 CXX_EXT = .cpp
 

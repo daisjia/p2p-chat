@@ -14,6 +14,7 @@
 #include<iostream>
 #include <fcntl.h>
 #include<unistd.h>
+#include"mytime.h"
 using namespace std;
 
 class Socket

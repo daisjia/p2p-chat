@@ -8,14 +8,14 @@ map<int, struct event*> myevents;
 
 void DealCli(int fd, short event, void* arg)
 {
-	cout << "dealcli" << endl;
 	struct sockaddr_in caddr = *(struct sockaddr_in*)arg;
-	string message;
-	int res = Sys::_ser->Recv(fd, message);
-	//cout << message << endl;
+	char message[1024] = { 0 };
+	int res = recv(fd, message, 1024, 0);
 	if (res <= 0)
 	{
-		cout << "cli exit!" << endl;
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "client exit!" << endl;
 		event_free(myevents[fd]);
 		myevents.erase(fd);
 		close(fd);
@@ -26,16 +26,19 @@ void DealCli(int fd, short event, void* arg)
 		Json::Reader read;
 		if (-1 == read.parse(message, val))
 		{
-			cout << "json prase error!" << endl;
+			char DateTime[_DATETIME_SIZE];
+			GetDateTime(DateTime);
+			cout << "===Author: Daijia===" << " " << DateTime << "json parse fail!" << endl;
 			return;
 		}
 		int type = val["type"].asInt();
-
+		
 		switch (type)
 		{
 		case REGISTER: Register(fd, message, caddr);  break;
 		case LOGIN: Login(fd, message, caddr); break;
 		case GETFRIEND: GetFriend(fd, message, caddr); break;
+		case GETIPPORT: GetIpPort(fd, message, caddr); break;
 		case EXIT: Exit(fd, message, caddr); break;
 		default:
 			break;
@@ -45,14 +48,14 @@ void DealCli(int fd, short event, void* arg)
 
 void Connect(int fd, short event, void* arg)
 {
-	cout << "connect" << endl;
 	Sys* sys = (Sys*)arg;
 	struct sockaddr_in caddr;
 	int clifd = Sys::_ser->Connect(caddr);
-	cout << "===============" << clifd << endl;
 	if (clifd == -1)
 	{
-		cout << "ser connect fail" << endl;
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "connect fail!" << endl;
 		return;
 	}
 	static int i = 0;
@@ -61,11 +64,12 @@ void Connect(int fd, short event, void* arg)
 	i++;
 	if (ev == NULL)
 	{
-		cout<<"event new fail!"<<endl;
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "event new fail!" << endl;
 	}
 
 	event_add(ev, NULL);
-	cout << "connect endl"<<endl;
 }
 
 Sys::Sys(const char* ip, const int port)
@@ -92,7 +96,6 @@ void Sys::Run()
 
 void* pthread_run(void*arg)
 {
-	cout << "1111111111111111111111" << endl;
 	int pair[2];
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == -1)
 	{
@@ -102,24 +105,27 @@ void* pthread_run(void*arg)
 	struct event* env = event_new(base, pair[0], EV_READ | EV_PERSIST, Connect, NULL);
 	event_add(env, NULL);
 	event_base_dispatch(base);
-	cout << "22222222222222222" << endl;
 }
 
-void Register(int fd, string& message, struct sockaddr_in& caddr)
+void Register(int fd, string message, struct sockaddr_in& caddr)
 {
 	Json::Value val;
 	Json::Reader read;
 	if (-1 == read.parse(message, val))
 	{
-		cout<<"json prase error!"<<endl;
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "json parse fail!" << endl;
 		return;
 	}
 	int userid = val["userid"].asInt();
 	map<int, CliData*>::iterator it = Sys::clidata.find(userid);
 	if (it != Sys::clidata.end())
 	{
-		cout << "user exist,register fail!" << endl;
-		Sys::_ser->Send(fd, "f");
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " register fail!" << endl;
+		Sys::_ser->Send(fd, "user exist!");
 		return;
 	}
 	int passwd = val["passwd"].asInt();
@@ -133,13 +139,15 @@ void Register(int fd, string& message, struct sockaddr_in& caddr)
 	Sys::clidata.insert(make_pair(userid, data));
 
 	Sys::_ser->Send(fd, "t");
-
+	char DateTime[_DATETIME_SIZE];
+	GetDateTime(DateTime);
+	cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: "<<userid << " register success!" << endl;
 
 	//	Json::Value val;
 	//	Json::Reader read;
 	//	if (read.parse(json, val) == -1)
 	//	{
-	//		LOGE("json parse error!");
+	//		LOGE("json parse fail!");
 	//		return;
 	//	}
 	//
@@ -151,7 +159,7 @@ void Register(int fd, string& message, struct sockaddr_in& caddr)
 	//	sprintf(cmd, "select id from chat where id = %d;", id);
 	//	if (mysql_real_query(mysql.mpcon, cmd, strlen(cmd)))
 	//	{
-	//		LOGE("select error!");
+	//		LOGE("select fail!");
 	//		return;
 	//	}
 	//
@@ -178,19 +186,161 @@ void Register(int fd, string& message, struct sockaddr_in& caddr)
 	//	LOGD(buff);
 }
 
-void Login(int fd, string& message, struct sockaddr_in& caddr)
+void Login(int fd, string message, struct sockaddr_in& caddr)
 {
-
-
+	Json::Value val;
+	Json::Reader read;
+	if (-1 == read.parse(message, val))
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "json parse fail!" << endl;
+		return;
+	}
+	int userid = val["userid"].asInt();
+	map<int, CliData*>::iterator it = Sys::clidata.find(userid);
+	if (it == Sys::clidata.end())
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " not exist!" << endl;
+		Sys::_ser->Send(fd, "user not exist!");
+		return;
+	}
+	int passwd = val["passwd"].asInt();
+	if (passwd == it->second->passwd)
+	{
+		if (it->second->state == 1)
+		{
+			Sys::_ser->Send(fd, "login fail, user alreadly online!");
+			return;
+		}
+		it->second->state = 1;
+		Sys::_ser->Send(fd, "t");
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " login success!" << endl;
+	}
+	else
+	{
+		Sys::_ser->Send(fd, "passwd error!");
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " login fail!" << endl;
+	}
 }
 
-void GetFriend(int fd, string& message, struct sockaddr_in& caddr)
+void GetFriend(int fd, string message, struct sockaddr_in& caddr)
 {
+	Json::Value val;
+	Json::Reader read;
+	if (-1 == read.parse(message, val))
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "json parse fail!" << endl;
+		return;
+	}
+	int userid = val["userid"].asInt();
+	map<int, CliData*>::iterator it = Sys::clidata.find(userid);
+	if (it == Sys::clidata.end())
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " getfriend fail!" << endl;
+		Sys::_ser->Send(fd, "please register first!");
+		return;
+	}
+	if(it->second->state == 0)
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " getfriend fail!" << endl;
+		Sys::_ser->Send(fd, "please login first!");
+		return;
+	}
+	
+	char buff[1024 * 1024] = { 0 };
+	it = Sys::clidata.begin();
+	for (; it != Sys::clidata.end(); it++)
+	{
+		if (it->second->state == 1)
+		{
+			char buff1[100] = { 0 };
+			sprintf(buff1, "userid: %d   name: %s\n", it->second->userid, it->second->name.c_str());
+			strcat(buff, buff1);
+		}
+	}
 
-
+	Sys::_ser->Send(fd, buff);
+	char DateTime[_DATETIME_SIZE];
+	GetDateTime(DateTime);
+	cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " getfriend success!" << endl;
 }
 
-void Exit(int fd, string& message, struct sockaddr_in& caddr)
+void GetIpPort(int fd, string message, struct sockaddr_in& caddr)
+{
+	Json::Value val;
+	Json::Reader read;
+	if (-1 == read.parse(message, val))
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "json parse fail!" << endl;
+		return;
+	}
+	int userid = val["userid"].asInt();
+	int friendid = val["friendid"].asInt();
+	map<int, CliData*>::iterator it = Sys::clidata.find(userid);
+	if (it == Sys::clidata.end())
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
+		Sys::_ser->Send(fd, "please register first!");
+		return;
+	}
+	if (it->second->state == 0)
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
+		Sys::_ser->Send(fd, "please login first!");
+		return;
+	}
+
+	it = Sys::clidata.find(friendid);
+	if (it == Sys::clidata.end())
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
+		Sys::_ser->Send(fd, "your friend not exist!");
+		return;
+	}
+
+	if (it->second->state == 0)
+	{
+		char DateTime[_DATETIME_SIZE];
+		GetDateTime(DateTime);
+		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
+		Sys::_ser->Send(fd, "your friend not online!");
+		return;
+	}
+
+	Json::Value vall;
+	vall["userid"] = it->second->userid;
+	vall["name"] = it->second->name;
+	vall["ip"] = inet_ntoa(it->second->caddr.sin_addr);
+	vall["port"] = ntohs(it->second->caddr.sin_port);
+
+	Sys::_ser->Send(fd, vall.toStyledString());
+	char DateTime[_DATETIME_SIZE];
+	GetDateTime(DateTime);
+	cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " GetIpPort success!" << endl;
+}
+
+void Exit(int fd, string message, struct sockaddr_in& caddr)
 {
 
 
