@@ -38,6 +38,7 @@ public:
 	struct event_base* base;
 	map<int, struct event_base*> clibase;
 	static map<int, CliData*> clidata;
+	static map<int, int> user;
 	static Socket* _ser;
 };
 

@@ -1,6 +1,7 @@
 #include"sys.h"
 
 map<int, CliData*>Sys::clidata;
+map<int, int>Sys::user;
 Socket* Sys::_ser;
 //map<int, struct event_base*> Sys::clibase;
 //Mysql mysql;
@@ -13,6 +14,11 @@ void DealCli(int fd, short event, void* arg)
 	int res = recv(fd, message, 1024, 0);
 	if (res <= 0)
 	{
+		map<int, int>::iterator it = Sys::user.find(fd);
+		if (it != Sys::user.end())
+		{
+			Sys::clidata[it->second]->state = 0;
+		}
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "client exit!" << endl;
@@ -110,6 +116,7 @@ void* pthread_run(void*arg)
 void Register(int fd, string message, struct sockaddr_in& caddr)
 {
 	Json::Value val;
+	Json::Value rsp;
 	Json::Reader read;
 	if (-1 == read.parse(message, val))
 	{
@@ -125,20 +132,28 @@ void Register(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " register fail!" << endl;
-		Sys::_ser->Send(fd, "user exist!");
+		rsp["res"] = false;
+		rsp["message"] = "user exist!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 	int passwd = val["passwd"].asInt();
 	string name = val["name"].asString();
+
+	srand(time(NULL));
+	int cliport = (rand() % (20000 - 5000)) + 5000;
+	rsp["res"] = true;
+	rsp["port"] = cliport;
+	rsp["message"] = "register success!";
+	Sys::_ser->Send(fd, rsp.toStyledString());
 	CliData* data = new CliData();
 	data->name = name;
 	data->caddr = caddr;
+	data->caddr.sin_port = htons(cliport);
 	data->passwd = passwd;
 	data->state = 0;
 	data->userid = userid;
 	Sys::clidata.insert(make_pair(userid, data));
-
-	Sys::_ser->Send(fd, "t");
 	char DateTime[_DATETIME_SIZE];
 	GetDateTime(DateTime);
 	cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: "<<userid << " register success!" << endl;
@@ -190,6 +205,7 @@ void Login(int fd, string message, struct sockaddr_in& caddr)
 {
 	Json::Value val;
 	Json::Reader read;
+	Json::Value rsp;
 	if (-1 == read.parse(message, val))
 	{
 		char DateTime[_DATETIME_SIZE];
@@ -204,7 +220,9 @@ void Login(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " not exist!" << endl;
-		Sys::_ser->Send(fd, "user not exist!");
+		rsp["res"] = false;
+		rsp["message"] = "user not exist!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 	int passwd = val["passwd"].asInt();
@@ -212,18 +230,25 @@ void Login(int fd, string message, struct sockaddr_in& caddr)
 	{
 		if (it->second->state == 1)
 		{
-			Sys::_ser->Send(fd, "login fail, user alreadly online!");
+			rsp["res"] = false;
+			rsp["message"] = "login fail, user alreadly online!";
+			Sys::_ser->Send(fd, rsp.toStyledString());
 			return;
 		}
 		it->second->state = 1;
-		Sys::_ser->Send(fd, "t");
+		Sys::user.insert(make_pair(fd, userid));
+		rsp["res"] = true;
+		rsp["message"] = "login success!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " login success!" << endl;
 	}
 	else
 	{
-		Sys::_ser->Send(fd, "passwd error!");
+		rsp["res"] = false;
+		rsp["message"] = "passwd error!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " login fail!" << endl;
@@ -234,6 +259,7 @@ void GetFriend(int fd, string message, struct sockaddr_in& caddr)
 {
 	Json::Value val;
 	Json::Reader read;
+	Json::Value rsp;
 	if (-1 == read.parse(message, val))
 	{
 		char DateTime[_DATETIME_SIZE];
@@ -248,7 +274,9 @@ void GetFriend(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " getfriend fail!" << endl;
-		Sys::_ser->Send(fd, "please register first!");
+		rsp["res"] = false;
+		rsp["message"] = "please register first!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 	if(it->second->state == 0)
@@ -256,7 +284,9 @@ void GetFriend(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " getfriend fail!" << endl;
-		Sys::_ser->Send(fd, "please login first!");
+		rsp["res"] = false;
+		rsp["message"] = "please login first!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 	
@@ -264,15 +294,16 @@ void GetFriend(int fd, string message, struct sockaddr_in& caddr)
 	it = Sys::clidata.begin();
 	for (; it != Sys::clidata.end(); it++)
 	{
-		if (it->second->state == 1)
+		if (it->second->state == 1 && it->first != val["userid"].asInt())
 		{
 			char buff1[100] = { 0 };
 			sprintf(buff1, "userid: %d   name: %s\n", it->second->userid, it->second->name.c_str());
 			strcat(buff, buff1);
 		}
 	}
-
-	Sys::_ser->Send(fd, buff);
+	rsp["res"] = true;
+	rsp["message"] = buff;
+	Sys::_ser->Send(fd, rsp.toStyledString());
 	char DateTime[_DATETIME_SIZE];
 	GetDateTime(DateTime);
 	cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " getfriend success!" << endl;
@@ -282,11 +313,15 @@ void GetIpPort(int fd, string message, struct sockaddr_in& caddr)
 {
 	Json::Value val;
 	Json::Reader read;
+	Json::Value rsp;
 	if (-1 == read.parse(message, val))
 	{
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "json parse fail!" << endl;
+		rsp["res"] = false;
+		rsp["message"] = "req message error!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 	int userid = val["userid"].asInt();
@@ -297,7 +332,9 @@ void GetIpPort(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
-		Sys::_ser->Send(fd, "please register first!");
+		rsp["res"] = false;
+		rsp["message"] = "please register first!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 	if (it->second->state == 0)
@@ -305,7 +342,9 @@ void GetIpPort(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
-		Sys::_ser->Send(fd, "please login first!");
+		rsp["res"] = false;
+		rsp["message"] = "please login first!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 
@@ -315,7 +354,9 @@ void GetIpPort(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
-		Sys::_ser->Send(fd, "your friend not exist!");
+		rsp["res"] = false;
+		rsp["message"] = "your friend not exist!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 
@@ -324,17 +365,19 @@ void GetIpPort(int fd, string message, struct sockaddr_in& caddr)
 		char DateTime[_DATETIME_SIZE];
 		GetDateTime(DateTime);
 		cout << "===Author: Daijia===" << " " << DateTime << "  userid: " << userid << " GetIpPort fail!" << endl;
-		Sys::_ser->Send(fd, "your friend not online!");
+		rsp["res"] = false;
+		rsp["message"] = "your friend not online!";
+		Sys::_ser->Send(fd, rsp.toStyledString());
 		return;
 	}
 
-	Json::Value vall;
-	vall["userid"] = it->second->userid;
-	vall["name"] = it->second->name;
-	vall["ip"] = inet_ntoa(it->second->caddr.sin_addr);
-	vall["port"] = ntohs(it->second->caddr.sin_port);
+	rsp["res"] = true;
+	rsp["userid"] = it->second->userid;
+	rsp["name"] = it->second->name;
+	rsp["ip"] = inet_ntoa(it->second->caddr.sin_addr);
+	rsp["port"] = ntohs(it->second->caddr.sin_port);
 
-	Sys::_ser->Send(fd, vall.toStyledString());
+	Sys::_ser->Send(fd, rsp.toStyledString());
 	char DateTime[_DATETIME_SIZE];
 	GetDateTime(DateTime);
 	cout << "===Author: Daijia===" << " Time: " << DateTime << "  userid: " << userid << " GetIpPort success!" << endl;
